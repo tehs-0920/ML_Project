@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Intelligent Crop Recommendation</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f7f4;
+            margin: 0;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 6px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #2e7d32;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 25px;
+            border: none;
+            border-radius: 6px;
+            background: #2e7d32;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #256628;
+        }
+
+        button:disabled {
+            background: #888;
+            cursor: not-allowed;
+        }
+
+        #result {
+            margin-top: 25px;
+            padding: 20px;
+            background: #eef7ee;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+
+        #crop {
+            font-size: 28px;
+            font-weight: bold;
+            margin-top: 8px;
+            color: #2e7d32;
+        }
+
+        #confidence {
+            margin-top: 8px;
+            font-size: 16px;
+        }
+
+        #error {
+            margin-top: 15px;
+            color: red;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>🌱 Crop Recommendation System</h1>
+
+        <p class="subtitle">
+            Enter soil and environmental conditions to get a crop recommendation.
+        </p>
+
+        <label for="N">Nitrogen (N)</label>
+        <input type="number" id="N" step="any" required>
+
+        <label for="P">Phosphorus (P)</label>
+        <input type="number" id="P" step="any" required>
+
+        <label for="K">Potassium (K)</label>
+        <input type="number" id="K" step="any" required>
+
+        <label for="temperature">Temperature (°C)</label>
+        <input type="number" id="temperature" step="any" required>
+
+        <label for="humidity">Humidity (%)</label>
+        <input type="number" id="humidity" step="any" required>
+
+        <label for="ph">Soil pH</label>
+        <input type="number" id="ph" step="any" required>
+
+        <label for="rainfall">Rainfall (mm)</label>
+        <input type="number" id="rainfall" step="any" required>
+
+        <button id="recommendButton" onclick="recommendCrop()">
+            Recommend Crop
+        </button>
+
+        <div id="result">
+            <div>Recommended Crop</div>
+
+            <div id="crop"></div>
+
+            <div id="confidence"></div>
+        </div>
+
+        <div id="error"></div>
+
+    </div>
+
+
+    <script>
+
+        async function recommendCrop() {
+
+            const errorElement = document.getElementById("error");
+            const resultElement = document.getElementById("result");
+            const cropElement = document.getElementById("crop");
+            const confidenceElement = document.getElementById("confidence");
+            const button = document.getElementById("recommendButton");
+
+            // Clear previous messages
+            errorElement.textContent = "";
+            resultElement.style.display = "none";
+
+            // Get input values
+            const N = document.getElementById("N").value.trim();
+            const P = document.getElementById("P").value.trim();
+            const K = document.getElementById("K").value.trim();
+            const temperature =
+                document.getElementById("temperature").value.trim();
+            const humidity =
+                document.getElementById("humidity").value.trim();
+            const ph =
+                document.getElementById("ph").value.trim();
+            const rainfall =
+                document.getElementById("rainfall").value.trim();
+
+            // Check for empty fields
+            if (
+                N === "" ||
+                P === "" ||
+                K === "" ||
+                temperature === "" ||
+                humidity === "" ||
+                ph === "" ||
+                rainfall === ""
+            ) {
+                errorElement.textContent =
+                    "Please enter values in all fields.";
+                return;
+            }
+
+            // Convert values to numbers
+            const requestData = {
+                N: Number(N),
+                P: Number(P),
+                K: Number(K),
+                temperature: Number(temperature),
+                humidity: Number(humidity),
+                ph: Number(ph),
+                rainfall: Number(rainfall)
+            };
+
+            // Check for invalid numbers
+            if (
+                Object.values(requestData).some(
+                    value => !Number.isFinite(value)
+                )
+            ) {
+                errorElement.textContent =
+                    "Please enter valid numerical values.";
+                return;
+            }
+
+            // Disable button while requesting prediction
+            button.disabled = true;
+            button.textContent = "Predicting...";
+
+            try {
+
+                const response = await fetch(
+                    "http://localhost:8000/predict",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+
+                        body: JSON.stringify(requestData)
+                    }
+                );
+
+                // Handle HTTP errors
+                if (!response.ok) {
+
+                    let errorMessage =
+                        "The prediction request failed.";
+
+                    try {
+                        const errorData = await response.json();
+
+                        if (errorData.detail) {
+                            errorMessage = errorData.detail;
+                        }
+
+                    } catch (e) {
+                        // Ignore JSON parsing error
+                    }
+
+                    if (response.status === 422) {
+                        errorMessage =
+                            "Please check that all input values are valid.";
+                    }
+
+                    throw new Error(errorMessage);
+                }
+
+                // Read response
+                const data = await response.json();
+
+                console.log("Prediction response:", data);
+
+                // Get recommended crop
+                const recommendedCrop =
+                    data.recommended_crop ||
+                    data.crop ||
+                    data.prediction;
+
+                if (!recommendedCrop) {
+                    throw new Error(
+                        "The server did not return a crop prediction."
+                    );
+                }
+
+                // Display crop
+                cropElement.textContent =
+                    String(recommendedCrop).toUpperCase();
+
+                // Display confidence
+                if (
+                    data.confidence !== undefined &&
+                    data.confidence !== null
+                ) {
+
+                    confidenceElement.textContent =
+                        "Confidence: " + data.confidence + "%";
+
+                } else {
+
+                    confidenceElement.textContent = "";
+                }
+
+                // Show result
+                resultElement.style.display = "block";
+
+            } catch (error) {
+
+                console.error("Prediction error:", error);
+
+                if (error.message === "Failed to fetch") {
+
+                    errorElement.textContent =
+                        "Unable to connect to the prediction server. " +
+                        "Make sure FastAPI is running on port 8000.";
+
+                } else {
+
+                    errorElement.textContent = error.message;
+                }
+
+            } finally {
+
+                // Enable button again
+                button.disabled = false;
+                button.textContent = "Recommend Crop";
+            }
+        }
+
+    </script>
+
+</body>
+
+</html>
